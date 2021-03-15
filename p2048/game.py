@@ -59,6 +59,8 @@ class BasicResolutionRuleset(ResolutionRuleset):
         # re-pack stuff
         nnib = [a for a in nnib if a is None] + [a for a in nnib if a is not None]
         return nnib
+
+
 class Board(object):
     """A Board has a width, a height, a ResolutionRuleset, a random seed
     

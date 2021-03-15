@@ -2,29 +2,25 @@
 
 from . import *
 import sys
+import readchar
 def repl():
     b = Board()
     b.initialize_board()
     print("play with zxcv or udlr")
     while (True):
-        command, *a = input("(u,d,l,r,p,q) >").split(" ")
-        command = command.lower()
-        if command in ("u", "c"):
+        print(b)
+        command = readchar.readkey()
+        if command in (readchar.key.UP, 'c'):
             b.up()
-            print(b)
-        elif command in ("d", "x"):
+        elif command in (readchar.key.DOWN, "x"):
             b.down()
-            print(b)
-        elif command in ("l", "z"):
+        elif command in (readchar.key.LEFT, "c"):
             b.left()
-            print(b)
-        elif command in ("r", "v"):
+        elif command in (readchar.key.RIGHT, "v"):
             b.right()
-            print(b)
         elif command in ('p'):
             print(b)
         elif command in ('q'):
-            print(b)
             print("bye!")
             sys.exit(0)
             
