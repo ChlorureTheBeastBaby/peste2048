@@ -3,10 +3,15 @@
 from . import *
 import sys
 import readchar
+import random
+random.seed()
 def repl():
     b = Board()
     b.initialize_board()
-    print("play with zxcv or udlr")
+    print("""play with arrows/zxcv and
+            p: print board
+            s: start a new game with a random seed
+            q: quit game""")
     while (True):
         print(b)
         command = readchar.readkey()
@@ -20,6 +25,12 @@ def repl():
             b.right()
         elif command in ('p'):
             print(b)
+        elif command in ('s'):
+            seed = random.randint(0, sys.maxsize)
+            print("New game using seed", seed)
+            b = Board(seed=seed)
+            b.initialize_board()
+            print("enjoy")
         elif command in ('q'):
             print("bye!")
             sys.exit(0)
