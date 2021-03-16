@@ -10,8 +10,14 @@ class Directions(Enum):
     LEFT = 2
     DOWN = 3
 
+
 class ResolutionRuleset(object):
-    def transformed(self, board: 'Board', direction: 'Directions') -> "Board":
+    """ResolutionRuleset objects apply transforms to boards
+
+    They must not share game state with the board but rather peek and poke
+    into the board state
+    """
+    def transform(self, board: 'Board', direction: 'Directions') -> "Board":
         """give transform of a board along a direction.
 
         Return None if the move is not legal, and the data array otherwise
@@ -20,7 +26,44 @@ class ResolutionRuleset(object):
 
 
 class BasicResolutionRuleset(ResolutionRuleset):
-    def transformed(self, board: 'Board', direction: 'Directions'):
+    def initialize_board(self, board, max_squares=2):
+        """Initialize the board with a given square"""
+        return self.add_random_value(board=board, count=max_squares)
+
+    def add_random_value(self, board, possible_values=(None, None, None, 2, 2, 2, 4), count=1):
+        """Add a random value to the board"""
+        squares = count
+        l = list(range(board.width * board.height))
+        if len([a is None for a in board.values]) < count:
+            print("cannot add random values, board too full")
+            return False
+        while squares > 0:
+            board._random.shuffle(l)
+            for pos in l:
+                if board._values[pos] is not None:
+                    continue
+                c = board._random.choice(possible_values)
+                if c is not None:
+                    with board._lock:
+                        board._values[pos] = c
+                        squares -= 1
+                if squares == 0:
+                    break
+            if squares == 0:
+                break
+        return True
+
+    def legal_moves(self, board: 'Board'):
+        """return the list of legal moves on the board"""
+        out = {}
+        for i in Directions:
+            legal, _, scoregain = self.pre_transform(board, i)
+            if legal:
+                out[i] = scoregain
+        return out
+
+
+    def pre_transform(self, board: 'Board', direction: 'Directions'):
         legal = False
         if direction is Directions.DOWN:
             data = board.as_column_array(False)
@@ -33,32 +76,45 @@ class BasicResolutionRuleset(ResolutionRuleset):
         else:
             raise RuntimeError('wrong direction')
         newdata = []
+        plus_score = 0
         for nib in data:
-            newnib = self.transform_nib(nib)
+            newnib, ps = self.transform_nib(nib)
+            plus_score += ps
             if any(newnib[a] != nib[a] for a in range(len(nib))):
                 legal = True
             newdata.append(newnib)
-
         if legal:
-            return board.flatten_array(newdata, direction)
+            return True, board.flatten_array(newdata, direction), plus_score
+        return False, None, 0
+                
+    def transform(self, board: 'Board', direction: 'Directions'):
+        legal, transformed, plus_score = self.pre_transform(board, direction)
+        if legal: 
+            board.values = transformed
+            self.add_random_value(board, count=1)
+            board.add_score(plus_score)
+            
         return None
     
 
-    def transform_nib(self, nib) -> 'array':
+    def transform_nib(self, nib) -> 'array, score':
         # first we need to push all the items to the end of the list.
         # all the empty squares will be left on the beginning
         nnib = [a for a in nib if a is None] + [a for a in nib if a is not None]
         # now we merge identical elements from the end
         pos = len(nnib) - 1
+        score = 0
         while pos > 0:
             if nnib[pos] and nnib[pos-1] == nnib[pos]:
                 nnib[pos] *= 2
                 nnib[pos-1] = None
+                score += int(nnib[pos])
+                
             pos -= 1
         
         # re-pack stuff
         nnib = [a for a in nnib if a is None] + [a for a in nnib if a is not None]
-        return nnib
+        return nnib, score
 
 
 class Board(object):
@@ -76,7 +132,7 @@ class Board(object):
             for i, v in enumerate(newval):
                 self._values[i] = v
         
-    def __init__(self, width=4, height=4, resolution_ruleset: 'ResolutionRuleset'=None, seed=0):
+    def __init__(self, width=4, height=4, start_squares=2, resolution_ruleset: 'ResolutionRuleset'=None, seed=0):
         self._width = width
         self._height = height
         if not resolution_ruleset:
@@ -87,14 +143,22 @@ class Board(object):
         self._random = random.Random()
         self._random.seed(seed)
         self._lock = threading.RLock()
+        self._ruleset.initialize_board(self, start_squares)
+        self._score = 0
 
+    @property
+    def score(self):
+        return self._score
+
+    def add_score(self, score):
+        self._score += score
+        
     def move(self, direction):
-        nextary = self._ruleset.transformed(self, direction)
-        if not nextary:
-            print("Illegal move {}".format(direction))
-            return None
-        self.values = nextary
-        self.add_random_value()
+        self._ruleset.transform(self, direction)
+    
+    def get_possible_moves(self):
+        m = self._ruleset.legal_moves(self)
+        return m
     
     def up(self):
         return self.move(Directions.UP)
@@ -108,45 +172,7 @@ class Board(object):
     def right(self):
         return self.move(Directions.RIGHT)
 
-    def initialize_board(self, max_squares=2):
-        """Initialize the board with a given square"""
-        l = list(range(self.width * self.height))
-        squares = max_squares
-        while squares > 0:
-            self._random.shuffle(l)
-            for pos in l:
-                c = self._random.choice([None, None, None, 2, 2, 2, 4])
-                if c is not None:
-                    with self._lock:
-                        self._values[pos] = c
-                        squares -= 1
-                if squares == 0:
-                    break
-            if squares == 0:
-                break
             
-    def add_random_value(self, possible_values=(2, 4), count=1):
-        """Add a random value to the board"""
-        squares = count
-        l = list(range(self.width * self.height))
-        if not any(a is None for a in self.values):
-            print("cannot add random value, board full")
-            return
-        while squares > 0:
-            self._random.shuffle(l)
-            for pos in l:
-                if self._values[pos] is not None:
-                    continue
-                c = self._random.choice([None, None, None, 2, 2, 2, 4])
-                if c is not None:
-                    with self._lock:
-                        self._values[pos] = c
-                        squares -= 1
-                if squares == 0:
-                    break
-            if squares == 0:
-                break
-                
     @property
     def height(self):
         return self._height
@@ -256,7 +282,9 @@ class Board(object):
         grid = self.as_line_array()
         for l in grid:
             lstr = "|".join([self.format_square(i) for i in l])
-            s += lstr + "\n"
+            s += lstr
+            s += "\n" + "-" * len(lstr) + "\n"
+        s += "Score: " + str(self.score) + "\n"
         return s
     
 

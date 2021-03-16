@@ -7,13 +7,17 @@ import random
 random.seed()
 def repl():
     b = Board()
-    b.initialize_board()
     print("""play with arrows/zxcv and
             p: print board
             s: start a new game with a random seed
             q: quit game""")
     while (True):
         print(b)
+        lm = b.get_possible_moves()
+        if len(lm) == 0:
+            print("no possible moves left. game over :( press s for a new game")
+        else:
+            print("Possible moves", lm)
         command = readchar.readkey()
         if command in (readchar.key.UP, 'c'):
             b.up()
@@ -29,7 +33,6 @@ def repl():
             seed = random.randint(0, sys.maxsize)
             print("New game using seed", seed)
             b = Board(seed=seed)
-            b.initialize_board()
             print("enjoy")
         elif command in ('q'):
             print("bye!")
