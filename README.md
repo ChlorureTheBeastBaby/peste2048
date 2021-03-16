@@ -16,6 +16,7 @@ wtfpl it is because all hail Sam Hocevar.
 
 ![Screenshot of me losing at 2048 with 3060 points and a max 256](/screenshot.png "Me losing at p2048")
 
+![Screenshot of me winning at p2048 with 19696 points](/victolip2048.png "Sometimes i win too")
 # future
 
 no idea. maybe a bot.
